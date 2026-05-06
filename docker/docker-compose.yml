@@ -1,0 +1,62 @@
+services:
+  # Ollama embedding service
+  ollama:
+    image: ollama/ollama
+    container_name: ollama
+    ports:
+      - "11434:11434"
+    networks:
+      - rag-network
+    volumes:
+      - ${DATA_PATH}/ollama:/root/.ollama
+    restart: ${RESTART_POLICY}
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+    command: serve
+
+  # Qdrant vector database service
+  qdrant:
+    image: qdrant/qdrant
+    container_name: qdrant
+    ports:
+      - "6333:6333"  # HTTP
+      - "6334:6334"  # gRPC
+    networks:
+      - rag-network
+    volumes:
+      - ${DATA_PATH}/qdrant:/qdrant/storage
+    restart: ${RESTART_POLICY}
+    environment:
+      # - QDRANT__SERVICE__API_KEY=${QDRANT_API_KEY}
+      - QDRANT__SERVICE__ENABLE_STATIC_CONTENT=true # Web UI
+
+  # RAG Indexer service
+  indexer:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    depends_on:
+      - ollama
+      - qdrant
+    environment:
+      - RAG_EMBEDDING_OLLAMA_BASE_URL=http://ollama:11434
+      - RAG_EMBEDDING_OLLAMA_MODEL=nomic-embed-text
+      - RAG_VECTORSTORE_QDRANT_BASE_URL=http://qdrant:6333
+      - RAG_VECTORSTORE_QDRANT_COLLECTION=codebase
+      - RAG_PROJECT_PROJECT_NAME=${PROJECT_NAME:-angular-app}
+      - RAG_PROJECT_REPO_ROOT=/src
+    volumes:
+      - ${LOCAL_REPO_PATH:-.}:/src:ro
+    command: ["index"]
+    restart: ${RESTART_POLICY}
+    networks:
+      - rag-network
+
+
+networks:
+  rag-network:
+    driver: bridge

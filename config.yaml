@@ -1,0 +1,33 @@
+project:
+  project_name: "web-blogic-view"
+  repo_root: "/Volumes/Data/Works/web-blogic-view"
+  exclude:
+    - ".notes/**"
+    - ".agents/**"
+    - ".idea/**"
+    - ".vscode/**"
+    - "deprecated/**"
+    - "packages/**"
+    - "mobile/**"
+    - "e2e/**"
+
+embedding:
+  batch_size: 8
+  timeout: "30s"
+  ollama:
+    base_url: "http://localhost:11434"
+    model: "nomic-embed-text"
+
+vectorstore:
+  qdrant:
+    base_url: "http://localhost:6333"
+    api_key: ""
+    collection: "web-blogic-view"
+
+parser:
+  worker_count: 5
+  channel_buffer: 100
+
+chunking:
+  max_chars: 2500
+  overlap_lines: 20
