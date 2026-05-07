@@ -31,6 +31,8 @@ type Config struct {
 		MaxChars     int `mapstructure:"max_chars"`
 		OverlapLines int `mapstructure:"overlap_lines"`
 	}
+
+	MCP MCPConfig `mapstructure:"mcp"`
 }
 
 type ProjectConfig struct {

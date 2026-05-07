@@ -31,3 +31,8 @@ parser:
 chunking:
   max_chars: 2500
   overlap_lines: 20
+
+mcp:
+  default_limit: 8
+  max_limit: 20
+  max_context_lines: 80

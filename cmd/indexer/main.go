@@ -12,31 +12,14 @@ import (
 	"syscall"
 
 	"angular-codebase-rag/internal/config"
-	"angular-codebase-rag/internal/domain"
 	"angular-codebase-rag/internal/embedding"
 	"angular-codebase-rag/internal/parser/treesitter"
 	"angular-codebase-rag/internal/pipeline"
+	"angular-codebase-rag/internal/rag"
 	"angular-codebase-rag/internal/vector/qdrant"
 
 	"github.com/spf13/pflag"
 )
-
-type queryOutput struct {
-	Results []queryResult `json:"results"`
-}
-
-type queryResult struct {
-	Rank         int     `json:"rank"`
-	ID           string  `json:"id"`
-	Score        float32 `json:"score"`
-	RelativePath string  `json:"relative_path"`
-	StartLine    int     `json:"start_line"`
-	EndLine      int     `json:"end_line"`
-	Kind         string  `json:"kind"`
-	Symbol       string  `json:"symbol"`
-	ParentSymbol string  `json:"parent_symbol,omitempty"`
-	Snippet      string  `json:"snippet"`
-}
 
 func main() {
 	log.SetFlags(0)
@@ -125,32 +108,23 @@ func runQuery(args []string) error {
 		return fmt.Errorf("initialize embedder: %w", err)
 	}
 	vecStore := qdrant.NewClient(cfg.VectorStore.Qdrant.BaseURL, cfg.VectorStore.Qdrant.Collection, cfg.VectorStore.Qdrant.APIKey)
-
-	vector, err := embedder.Embed(ctx, query)
+	searcher := rag.NewSearchService(*cfg, embedder, vecStore)
+	response, err := searcher.Search(ctx, rag.SearchRequest{
+		Query: query,
+		Limit: *limit,
+		Kind:  *kind,
+		Path:  *path,
+	})
 	if err != nil {
-		return fmt.Errorf("embed query: %w", err)
+		return err
 	}
 
-	filter := domain.Filter{"project_name": cfg.Project.Name}
-	if *kind != "" {
-		filter["chunk_kind"] = *kind
-	}
-	if *path != "" {
-		filter["relative_path"] = filepath.ToSlash(*path)
-	}
-
-	results, err := vecStore.Search(ctx, vector, *limit, filter)
-	if err != nil {
-		return fmt.Errorf("search qdrant: %w", err)
-	}
-
-	formatted := formatResults(results)
 	if *jsonOutput {
 		enc := json.NewEncoder(os.Stdout)
 		enc.SetIndent("", "  ")
-		return enc.Encode(queryOutput{Results: formatted})
+		return enc.Encode(response)
 	}
-	printResults(formatted)
+	printResults(response.Results)
 	return nil
 }
 
@@ -194,27 +168,7 @@ func signalContext() (context.Context, context.CancelFunc) {
 	return ctx, cancel
 }
 
-func formatResults(results []domain.Result) []queryResult {
-	formatted := make([]queryResult, 0, len(results))
-	for idx, result := range results {
-		payload := result.Payload
-		formatted = append(formatted, queryResult{
-			Rank:         idx + 1,
-			ID:           result.ID,
-			Score:        result.Score,
-			RelativePath: payloadString(payload, "relative_path"),
-			StartLine:    payloadInt(payload, "start_line"),
-			EndLine:      payloadInt(payload, "end_line"),
-			Kind:         payloadString(payload, "chunk_kind"),
-			Symbol:       payloadString(payload, "symbol_name"),
-			ParentSymbol: payloadString(payload, "parent_symbol"),
-			Snippet:      snippet(payloadString(payload, "content"), 700),
-		})
-	}
-	return formatted
-}
-
-func printResults(results []queryResult) {
+func printResults(results []rag.Result) {
 	if len(results) == 0 {
 		fmt.Println("No results.")
 		return
@@ -227,47 +181,6 @@ func printResults(results []queryResult) {
 		fmt.Printf("    %s\n", indentSnippet(result.Snippet))
 	}
 }
-
-func payloadString(payload map[string]interface{}, key string) string {
-	value, ok := payload[key]
-	if !ok || value == nil {
-		return ""
-	}
-	return fmt.Sprint(value)
-}
-
-func payloadInt(payload map[string]interface{}, key string) int {
-	value, ok := payload[key]
-	if !ok || value == nil {
-		return 0
-	}
-	switch typed := value.(type) {
-	case int:
-		return typed
-	case int64:
-		return int(typed)
-	case float64:
-		return int(typed)
-	case json.Number:
-		n, _ := typed.Int64()
-		return int(n)
-	default:
-		return 0
-	}
-}
-
-func snippet(content string, max int) string {
-	content = strings.TrimSpace(content)
-	content = strings.Join(strings.Fields(content), " ")
-	if len(content) <= max {
-		return content
-	}
-	if max < 4 {
-		return content[:max]
-	}
-	return content[:max-3] + "..."
-}
-
 func indentSnippet(text string) string {
 	return strings.ReplaceAll(text, "\n", "\n    ")
 }
