@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## [v0.2.0](https://github.com/zenkiet/angular-codebase-rag/compare/a2ee5274553e0cd3873e39955a395123f1e42d26..v0.2.0) - 2026-05-07
+#### Features
+- (**rag**) ✨ implement search service with configurable limits and response formatting - ([a2ee527](https://github.com/zenkiet/angular-codebase-rag/commit/a2ee5274553e0cd3873e39955a395123f1e42d26)) - Kiet Le
+
+- - -
+
 ## [v0.1.0](https://github.com/zenkiet/angular-codebase-rag/compare/376ca2bfcd3e808c24d8182061ff78d2fca3ed3c..v0.1.0) - 2026-05-07
 #### Features
 - (**setup**) ✨ init project - ([376ca2b](https://github.com/zenkiet/angular-codebase-rag/commit/376ca2bfcd3e808c24d8182061ff78d2fca3ed3c)) - Kiet Le
